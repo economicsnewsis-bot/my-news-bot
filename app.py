@@ -2,18 +2,23 @@ import streamlit as st
 import os
 import sys
 
-# --- הגדרות העמוד ---
-st.set_page_config(page_title="News Bot", layout="centered", page_icon="🤖")
+# --- הגדרות העמוד (חייב להיות ראשון) ---
+st.set_page_config(
+    page_title="News Bot",
+    layout="centered",
+    page_icon="🤖",
+    initial_sidebar_state="collapsed"
+)
 
-# --- כותרת ---
+# --- כותרת ועיצוב ---
 st.title("🤖 בוט החדשות האוטומטי")
-st.write("מערכת ליצירת רילס חדשותי עם כיתוב AI אוטומטי.")
+st.caption("יוצר רילס חדשותי עם כתוביות AI, מוכן להורדה או לפרסום.")
 
-# --- ייבוא הפונקציות (כולל התיקונים החדשים) ---
+# --- ייבוא הפונקציות מהקובץ הראשי ---
 try:
     from main import create_visual_content, create_video, upload_to_instagram, generate_reel_description, CONFIG
 except ImportError:
-    st.error("❌ שגיאה: לא מוצא את הקובץ main.py או שההתקנות חסרות.")
+    st.error("❌ שגיאה קריטית: לא ניתן לטעון את main.py. וודא שהקובץ קיים ב-GitHub.")
     st.stop()
 
 # ==========================================
@@ -22,9 +27,10 @@ except ImportError:
 
 st.divider()
 
-# תיבת בחירה להעלאה אוטומטית
+# תיבת בחירה: האם להעלות אוטומטית לאינסטגרם?
+# (ברירת המחדל נלקחת מההגדרות ב-main.py)
 upload_enabled = st.checkbox(
-    "✅ הפעל העלאה אוטומטית לאינסטגרם (Upload to Instagram)",
+    "📸 פרסום אוטומטי לאינסטגרם (Upload to Instagram)",
     value=CONFIG.get("UPLOAD_TO_INSTAGRAM", False)
 )
 
@@ -33,66 +39,71 @@ st.divider()
 # --- הכפתור הראשי ---
 if st.button("🔥 צור סרטון חדש 🔥", type="primary", use_container_width=True):
     
-    # אזור סטטוס שנפתח ונסגר
+    # אזור סטטוס שנפתח ונסגר אוטומטית
     status_box = st.status("⏳ מתחיל בתהליך...", expanded=True)
     
     try:
         # 1. חיפוש חדשות ותמונות
-        status_box.write("🔎 מחפש חדשות ומוריד תמונות...")
+        status_box.write("🔎 סורק את הרשת אחר חדשות חמות...")
         img_path, vid_path, data = create_visual_content()
         
         if not img_path or not data:
-            status_box.update(label="❌ נכשל: לא נמצאו חדשות", state="error")
-            st.error("לא הצלחתי למצוא חדשות או תמונה מתאימה.")
+            status_box.update(label="❌ נכשל: לא נמצאו חדשות מתאימות", state="error")
+            st.error("לא הצלחתי למצוא חדשות או תמונה מתאימה כרגע.")
             
         else:
             status_box.write(f"✅ נמצאה כתבה: {data['title']}")
             
-            # 2. יצירת וידאו
-            status_box.write("🎥 עורך את הוידאו...")
+            # 2. יצירת וידאו (MoviePy)
+            status_box.write("🎥 עורך את הוידאו ומוסיף מוזיקה...")
             success = create_video(img_path, vid_path)
             
             if success:
-                # 3. יצירת תיאור (AI)
-                status_box.write("🤖 ג'מיני כותב תיאור...")
+                # 3. יצירת תיאור (Gemini AI)
+                status_box.write("🤖 ג'מיני כותב תיאור לפוסט...")
                 ai_text = generate_reel_description(data['title'], data['description'])
-                final_caption = f"{ai_text}\n\n#חדשות {data['hashtags']}"
                 
-                status_box.update(label="✨ התהליך הסתיים!", state="complete", expanded=False)
+                # יצירת התיאור הסופי (הטקסט של ה-AI + האשטאגים)
+                # אם אתה רוצה רק מה שה-AI כתב, תשאיר רק את ai_text
+                final_caption = ai_text 
                 
-                # ============================================
-                # 👇👇👇 כאן קובעים את הסדר בתצוגה 👇👇👇
-                # ============================================
+                status_box.update(label="✨ הסרטון מוכן!", state="complete", expanded=False)
                 
-                # א. קודם כל הוידאו
+                # --- הצגת התוצאה ---
+                st.balloons()
+                
                 st.subheader("📺 התוצאה הסופית")
                 st.video(vid_path)
                 
-                # ב. קו מפריד
+                # --- כפתור הורדה לטלפון (חשוב מאוד בענן!) ---
+                with open(vid_path, "rb") as file:
+                    st.download_button(
+                        label="⬇️ שמור את הסרטון לגלריה (Download)",
+                        data=file,
+                        file_name="news_reel.mp4",
+                        mime="video/mp4",
+                        use_container_width=True
+                    )
+                
                 st.divider()
                 
-                # ג. התיאור מופיע *מתחת* לוידאו
-                st.subheader("📝 התיאור שנוצר (Caption)")
-                st.info("התיאור הזה יישלח לאינסטגרם (או שתוכל להעתיק אותו מכאן):")
+                # --- הצגת התיאור להעתקה ---
+                st.subheader("📝 תיאור לפוסט (Caption)")
+                st.info("העתק את הטקסט הזה לטיקטוק/אינסטגרם:")
+                st.text_area("תוכן:", value=final_caption, height=150)
                 
-                # תיבת טקסט נוחה להעתקה (בצד ימין לשמאל)
-                st.text_area("תוכן הפוסט:", value=final_caption, height=200)
-                
-                # ============================================
-
-                # 4. העלאה לאינסטגרם (אם סומן ה-Checkbox)
+                # --- שלב ההעלאה לאינסטגרם (רק אם סומן) ---
                 if upload_enabled:
-                    with st.spinner("🚀 מעלה לאינסטגרם..."):
+                    with st.spinner("🚀 מתחבר לאינסטגרם ומעלה..."):
                         upload_to_instagram(vid_path, final_caption)
                     st.success("✅ הסרטון פורסם באינסטגרם בהצלחה!")
-                    st.balloons()
                 else:
-                    st.warning("⚠️ מצב 'העלאה' כבוי. הסרטון נשמר במחשב בלבד.")
+                    st.warning("⚠️ מצב 'העלאה אוטומטית' כבוי. הסרטון זמין להורדה בלבד.")
 
             else:
                 status_box.update(label="❌ שגיאה בעריכת הוידאו", state="error")
-                st.error("הייתה בעיה ביצירת קובץ ה-MP4.")
+                st.error("הייתה בעיה טכנית ביצירת קובץ ה-MP4.")
 
     except Exception as e:
         status_box.update(label="❌ שגיאה קריטית", state="error")
-        st.error(f"התרחשה שגיאה: {e}")
+        st.error(f"התרחשה שגיאה לא צפויה: {e}")
