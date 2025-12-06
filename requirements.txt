@@ -1,0 +1,10 @@
+streamlit
+google-generativeai
+requests
+matplotlib
+pillow
+beautifulsoup4
+moviepy
+instagrapi
+arabic-reshaper
+python-bidi
