@@ -125,69 +125,43 @@ def smart_crop_image(img, target_width=1080, target_height=1920):
 # יש להוסיף את זה למעלה באימפורטים:
 from google.genai import types 
 
+# חשוב: וודא שיש את השורה הזו למעלה בקובץ
+import streamlit as st 
+
 def generate_reel_description(title, description):
-    """הגרסה החכמה: קודם בודקת איזה מודל קיים בחשבון, ואז משתמשת בו."""
+    """גרסה חכמה: עובדת גם מהמחשב וגם מהענן של Streamlit"""
     
-    # ==========================================
-    # 👇👇👇 המפתח שלך 👇👇👇
-    # ==========================================
-    raw_key = "AIzaSyDjy7ijfAyuhYQBNKNPwTi9TwuKfGUB5s0" 
-    # ==========================================
-
-    clean_key = re.sub(r'[^a-zA-Z0-9_\-]', '', raw_key)
-    
-    # שלב 1: מציאת מודל זמין (כמו שעשית בדפדפן)
-    print("   [Gemini] Auto-detecting available models...")
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
-    
-    chosen_model = "models/gemini-1.5-flash" # ברירת מחדל
-    
+    # --- התיקון: ניסיון למשוך מהכספת בענן ---
     try:
-        list_resp = requests.get(list_url, timeout=10)
-        if list_resp.status_code == 200:
-            data = list_resp.json()
-            # מחפש את המודל הראשון שיודע לייצר תוכן
-            for m in data.get('models', []):
-                if 'generateContent' in m.get('supportedGenerationMethods', []):
-                    chosen_model = m['name'] # לוקח את השם המדויק מהרשימה
-                    print(f"   [V] Found valid model: {chosen_model}")
-                    break
-        else:
-            print(f"   [!] Could not list models (Error {list_resp.status_code}). Trying default.")
-            
-    except Exception as e:
-        print(f"   [!] List models failed: {e}")
+        # מנסה לקרוא מהענן (Secrets)
+        my_key = st.secrets["GEMINI_API_KEY"]
+        print("   [Log] Using Cloud Secret Key")
+    except:
+        # אם נכשל (כי אתה במחשב בבית), משתמש במפתח לגיבוי
+        my_key = "AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" # <--- שים פה את המפתח שלך למקרה חירום
+        print("   [Log] Using Local Backup Key")
 
-    # שלב 2: שימוש במודל שנמצא
-    generate_url = f"https://generativelanguage.googleapis.com/v1beta/{chosen_model}:generateContent?key={clean_key}"
+    # מכאן הקוד ממשיך רגיל...
     
-    prompt_text = f"""
-    כתוב תיאור (Caption) קצר וקליט לסרטון רילס באינסטגרם.
-    נושא: חדשות טק ופיננסים. כותרת: "{title}".
-    כתוב בעברית, עד 3 משפטים, בלי מרכאות, עם האשטאגים.
-    """
+    # שליחה בטוחה ב-Header
+    headers = {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': my_key.strip()
+    }
     
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    
+    prompt_text = f"Write a short Instagram caption (Hebrew) for: {title}"
     payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
     
     try:
-        print(f"   [Gemini] Sending request to: {chosen_model}...")
-        response = requests.post(generate_url, json=payload, headers={'Content-Type': 'application/json'}, timeout=10)
-        
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
-            result = response.json()
-            if 'candidates' in result:
-                text = result['candidates'][0]['content']['parts'][0]['text']
-                print("   [V] GEMINI SUCCESS! Description generated.")
-                return text
-            else:
-                print(f"   [X] Empty response: {result}")
-        else:
-            print(f"   [X] Google Error {response.status_code}: {response.text}")
-
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
     except Exception as e:
-        print(f"   [X] Connection failed: {e}")
+        print(f"Error: {e}")
 
-    return f"חדשות: {title}\n\n{description[:500]}..."
+    return f"{title}\n\n{description[:200]}..."
 def get_custom_font(size):
     if os.path.exists(CONFIG["FONT_PATH"]):
         return fm.FontProperties(fname=CONFIG["FONT_PATH"], size=size)
